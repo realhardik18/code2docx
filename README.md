@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Code2Docx
+
+A web tool to build code question documents and export them as PDF or DOCX. Designed for students and educators to quickly assemble lab/assignment submissions with formatted code blocks and rendered output previews.
+
+## How It Works
+
+1. **Document Info** — Fill in title, subject, name, roll number, and date.
+2. **Add Blocks** — Add question blocks (with code files) or free-text blocks.
+3. **Attach Code Files** — Each question can have multiple files (HTML, CSS, JS, etc.). Files are combined to render a live output preview.
+4. **Export** — Hit **Export PDF** or **Export DOCX** to download a formatted document with code listings and output screenshots.
+
+## Libraries Used
+
+| Library | Purpose |
+|---------|---------|
+| [Next.js](https://nextjs.org/) | React framework (app router, build tooling) |
+| [React](https://react.dev/) | UI component library |
+| [Tailwind CSS](https://tailwindcss.com/) | Utility-first styling |
+| [docx](https://github.com/dolanmedia/docx) | Generates `.docx` Word documents in the browser |
+| [jsPDF](https://github.com/parallax/jsPDF) | Client-side PDF generation |
+| [html2canvas](https://html2canvas.hertzen.dev/) | Renders HTML/CSS output to canvas for screenshots |
+| [file-saver](https://github.com/eligrey/FileSaver.js) | Triggers browser file downloads |
+| [Sonner](https://sonner.emilkowal.dev/) | Toast notifications |
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+# Install dependencies
+npm install
+
+# Start dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Production build
+npm run build
+npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Open [http://localhost:3000](http://localhost:3000) to use the app.
