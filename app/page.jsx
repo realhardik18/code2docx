@@ -7,6 +7,22 @@ let idCounter = 0;
 const uid = () => `b-${++idCounter}`;
 const fid = () => `f-${++idCounter}`;
 
+const LANG_MAP = {
+  ".py": 71,    // Python 3
+  ".cpp": 54,   // C++ (GCC)
+  ".java": 62,  // Java
+};
+
+const RUNNABLE_EXTS = Object.keys(LANG_MAP);
+
+const getRunnable = (files) => {
+  for (const f of files) {
+    const ext = RUNNABLE_EXTS.find((e) => f.name.endsWith(e));
+    if (ext) return { file: f, langId: LANG_MAP[ext] };
+  }
+  return null;
+};
+
 export default function Home() {
   const [meta, setMeta] = useState({
     title: "",
@@ -21,7 +37,52 @@ export default function Home() {
   const updateMeta = (key, val) =>
     setMeta((p) => ({ ...p, [key]: val }));
 
-  const loadDemo = () => {
+  const makeBlock = (question, files) => ({
+    id: uid(),
+    type: "question",
+    question,
+    files: files.map((f) => ({ id: fid(), ...f })),
+    collapsed: false,
+    includeOutput: true,
+    stdin: "",
+    output: "",
+    running: false,
+  });
+
+  const runBlock = async (blockId) => {
+    const block = blocks.find((b) => b.id === blockId);
+    if (!block) return;
+    const r = getRunnable(block.files);
+    if (!r) { toast.error("No runnable file (.py, .cpp, .java) found."); return; }
+    if (!r.file.content.trim()) { toast.error("Write some code first."); return; }
+
+    setBlocks((p) => p.map((b) => b.id === blockId ? { ...b, running: true, output: "" } : b));
+    try {
+      const res = await fetch(
+        "https://ce.judge0.com/submissions?base64_encoded=true&wait=true",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source_code: btoa(unescape(encodeURIComponent(r.file.content))),
+            language_id: r.langId,
+            stdin: btoa(unescape(encodeURIComponent(block.stdin || ""))),
+          }),
+        }
+      );
+      const data = await res.json();
+      const decode = (s) => (s ? decodeURIComponent(escape(atob(s))) : "");
+      const stdout = decode(data.stdout);
+      const stderr = decode(data.stderr);
+      const compile = decode(data.compile_output);
+      const out = stdout || stderr || compile || data.status?.description || "No output";
+      setBlocks((p) => p.map((b) => b.id === blockId ? { ...b, output: out, running: false } : b));
+    } catch (err) {
+      setBlocks((p) => p.map((b) => b.id === blockId ? { ...b, output: `Error: ${err.message}`, running: false } : b));
+    }
+  };
+
+  const loadHtmlDemo = () => {
     setMeta({
       title: "Web Development Lab",
       date: new Date().toISOString().split("T")[0],
@@ -30,13 +91,10 @@ export default function Home() {
       rollNo: "2024001",
     });
     setBlocks([
-      {
-        id: uid(),
-        type: "question",
-        question: "Create a webpage with a heading and a styled paragraph using HTML and CSS.",
-        files: [
+      makeBlock(
+        "Create a webpage with a heading and a styled paragraph using HTML and CSS.",
+        [
           {
-            id: fid(),
             name: "index.html",
             content: `<!DOCTYPE html>
 <html>
@@ -50,7 +108,6 @@ export default function Home() {
 </html>`,
           },
           {
-            id: fid(),
             name: "style.css",
             content: `body {
   font-family: Arial, sans-serif;
@@ -70,17 +127,12 @@ h1 {
   line-height: 1.6;
 }`,
           },
-        ],
-        collapsed: false,
-        includeOutput: true,
-      },
-      {
-        id: uid(),
-        type: "question",
-        question: "Design a simple card component with a shadow and rounded corners.",
-        files: [
+        ]
+      ),
+      makeBlock(
+        "Design a simple card component with a shadow and rounded corners.",
+        [
           {
-            id: fid(),
             name: "index.html",
             content: `<!DOCTYPE html>
 <html>
@@ -97,7 +149,6 @@ h1 {
 </html>`,
           },
           {
-            id: fid(),
             name: "style.css",
             content: `body {
   font-family: Arial, sans-serif;
@@ -136,17 +187,12 @@ h1 {
   cursor: pointer;
 }`,
           },
-        ],
-        collapsed: false,
-        includeOutput: true,
-      },
-      {
-        id: uid(),
-        type: "question",
-        question: "Create a navigation bar with a horizontal list of links.",
-        files: [
+        ]
+      ),
+      makeBlock(
+        "Create a navigation bar with a horizontal list of links.",
+        [
           {
-            id: fid(),
             name: "index.html",
             content: `<!DOCTYPE html>
 <html>
@@ -167,7 +213,6 @@ h1 {
 </html>`,
           },
           {
-            id: fid(),
             name: "style.css",
             content: `* {
   margin: 0;
@@ -207,9 +252,201 @@ h1 {
   color: #3498db;
 }`,
           },
-        ],
-        collapsed: false,
-        includeOutput: true,
+        ]
+      ),
+    ]);
+  };
+
+  const loadPythonDemo = () => {
+    setMeta({
+      title: "Python Programming Lab",
+      date: new Date().toISOString().split("T")[0],
+      name: "John Doe",
+      subject: "Python Programming",
+      rollNo: "2024001",
+    });
+    setBlocks([
+      {
+        ...makeBlock(
+          "Write a Python program to find the sum, max, and min of a list of numbers.",
+          [{ name: "main.py", content: `n = int(input())
+nums = list(map(int, input().split()))
+print("Sum:", sum(nums))
+print("Max:", max(nums))
+print("Min:", min(nums))` }]
+        ),
+        stdin: "5\n3 1 4 1 5",
+      },
+      {
+        ...makeBlock(
+          "Write a Python program to check if a string is a palindrome.",
+          [{ name: "main.py", content: `s = input().strip()
+cleaned = s.lower().replace(" ", "")
+if cleaned == cleaned[::-1]:
+    print(f'"{s}" is a palindrome')
+else:
+    print(f'"{s}" is not a palindrome')` }]
+        ),
+        stdin: "racecar",
+      },
+      {
+        ...makeBlock(
+          "Write a Python program to find the factorial of a number using recursion.",
+          [{ name: "main.py", content: `def factorial(n):
+    if n <= 1:
+        return 1
+    return n * factorial(n - 1)
+
+n = int(input())
+print(f"Factorial of {n} is {factorial(n)}")` }]
+        ),
+        stdin: "6",
+      },
+    ]);
+  };
+
+  const loadCppDemo = () => {
+    setMeta({
+      title: "C++ Programming Lab",
+      date: new Date().toISOString().split("T")[0],
+      name: "John Doe",
+      subject: "C++ Programming",
+      rollNo: "2024001",
+    });
+    setBlocks([
+      {
+        ...makeBlock(
+          "Write a C++ program to find the sum, max, and min of an array.",
+          [{ name: "main.cpp", content: `#include <iostream>
+#include <algorithm>
+using namespace std;
+
+int main() {
+    int n;
+    cin >> n;
+    int arr[n], sum = 0;
+    for (int i = 0; i < n; i++) {
+        cin >> arr[i];
+        sum += arr[i];
+    }
+    cout << "Sum: " << sum << endl;
+    cout << "Max: " << *max_element(arr, arr + n) << endl;
+    cout << "Min: " << *min_element(arr, arr + n) << endl;
+    return 0;
+}` }]
+        ),
+        stdin: "5\n3 1 4 1 5",
+      },
+      {
+        ...makeBlock(
+          "Write a C++ program to reverse a string.",
+          [{ name: "main.cpp", content: `#include <iostream>
+#include <algorithm>
+#include <string>
+using namespace std;
+
+int main() {
+    string s;
+    getline(cin, s);
+    string rev = s;
+    reverse(rev.begin(), rev.end());
+    cout << "Original: " << s << endl;
+    cout << "Reversed: " << rev << endl;
+    return 0;
+}` }]
+        ),
+        stdin: "hello world",
+      },
+      {
+        ...makeBlock(
+          "Write a C++ program to check if a number is prime.",
+          [{ name: "main.cpp", content: `#include <iostream>
+using namespace std;
+
+bool isPrime(int n) {
+    if (n <= 1) return false;
+    for (int i = 2; i * i <= n; i++) {
+        if (n % i == 0) return false;
+    }
+    return true;
+}
+
+int main() {
+    int n;
+    cin >> n;
+    cout << n << (isPrime(n) ? " is prime" : " is not prime") << endl;
+    return 0;
+}` }]
+        ),
+        stdin: "17",
+      },
+    ]);
+  };
+
+  const loadJavaDemo = () => {
+    setMeta({
+      title: "Java Programming Lab",
+      date: new Date().toISOString().split("T")[0],
+      name: "John Doe",
+      subject: "Java Programming",
+      rollNo: "2024001",
+    });
+    setBlocks([
+      {
+        ...makeBlock(
+          "Write a Java program to check if a number is prime.",
+          [{ name: "Main.java", content: `import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        int n = sc.nextInt();
+        boolean isPrime = n > 1;
+        for (int i = 2; i * i <= n; i++) {
+            if (n % i == 0) { isPrime = false; break; }
+        }
+        System.out.println(n + (isPrime ? " is prime" : " is not prime"));
+    }
+}` }]
+        ),
+        stdin: "17",
+      },
+      {
+        ...makeBlock(
+          "Write a Java program to reverse a string.",
+          [{ name: "Main.java", content: `import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        String s = sc.nextLine();
+        String rev = new StringBuilder(s).reverse().toString();
+        System.out.println("Original: " + s);
+        System.out.println("Reversed: " + rev);
+    }
+}` }]
+        ),
+        stdin: "hello world",
+      },
+      {
+        ...makeBlock(
+          "Write a Java program to find the factorial of a number.",
+          [{ name: "Main.java", content: `import java.util.Scanner;
+
+public class Main {
+    static long factorial(int n) {
+        if (n <= 1) return 1;
+        return n * factorial(n - 1);
+    }
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        int n = sc.nextInt();
+        System.out.println("Factorial of " + n + " is " + factorial(n));
+    }
+}` }]
+        ),
+        stdin: "6",
       },
     ]);
   };
@@ -217,14 +454,7 @@ h1 {
   const addQuestion = () =>
     setBlocks((p) => [
       ...p,
-      {
-        id: uid(),
-        type: "question",
-        question: "",
-        files: [{ id: fid(), name: "index.html", content: "" }],
-        collapsed: false,
-        includeOutput: true,
-      },
+      makeBlock("", [{ name: "index.html", content: "" }]),
     ]);
 
   const addText = () =>
@@ -319,6 +549,9 @@ h1 {
     return html;
   };
 
+  const isRunnableBlock = (b) => b.type === "question" && getRunnable(b.files);
+  const isHtmlBlock = (b) => b.type === "question" && b.files.some((f) => f.name.endsWith(".html"));
+
   const buildExportHtml = useCallback(() => {
     let questionNum = 0;
     const blocksHtml = blocks
@@ -336,16 +569,34 @@ h1 {
             )
             .join("");
 
-          const combined = combineFilesForRender(b.files);
-          const outputHtml =
-            b.includeOutput && combined.trim()
-              ? `<div style="margin-top:12px;">
-                   <div style="font-weight:700;margin-bottom:6px;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;">Output</div>
-                   <div style="border:1px solid #d0d0d0;border-radius:3px;padding:12px;background:#fff;">
-                     ${combined}
-                   </div>
-                 </div>`
-              : "";
+          // Test cases (stdin)
+          const stdinHtml = b.stdin?.trim()
+            ? `<div style="margin-top:12px;">
+                <div style="font-weight:700;margin-bottom:6px;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;">Test Input</div>
+                <pre style="margin:0;border:1px solid #d0d0d0;border-radius:3px;padding:10px 12px;background:#f7f7f7;font-family:'Courier New',monospace;font-size:10px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word;color:#1a1a1a;">${escapeHtml(b.stdin)}</pre>
+              </div>`
+            : "";
+
+          let outputHtml = "";
+          if (b.includeOutput) {
+            const runnable = getRunnable(b.files);
+            if (runnable && b.output) {
+              outputHtml = `<div style="margin-top:12px;">
+                <div style="font-weight:700;margin-bottom:6px;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;">Output</div>
+                <pre style="margin:0;border:1px solid #d0d0d0;border-radius:3px;padding:10px 12px;background:#f7f7f7;font-family:'Courier New',monospace;font-size:10px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word;color:#1a1a1a;">${escapeHtml(b.output)}</pre>
+              </div>`;
+            } else if (!runnable) {
+              const combined = combineFilesForRender(b.files);
+              if (combined.trim()) {
+                outputHtml = `<div style="margin-top:12px;">
+                  <div style="font-weight:700;margin-bottom:6px;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;">Output</div>
+                  <div style="border:1px solid #d0d0d0;border-radius:3px;padding:12px;background:#fff;">
+                    ${combined}
+                  </div>
+                </div>`;
+              }
+            }
+          }
 
           return `
             <div style="margin-bottom:24px;">
@@ -355,6 +606,7 @@ h1 {
               </div>
               <div style="font-weight:700;margin-bottom:6px;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;">Code</div>
               ${filesHtml}
+              ${stdinHtml}
               ${outputHtml}
             </div>`;
         }
@@ -402,7 +654,6 @@ h1 {
       await new Promise((r) => {
         if (iframe.contentWindow) {
           iframe.contentWindow.onload = () => r(undefined);
-          // Fallback timeout in case onload doesn't fire
           setTimeout(() => r(undefined), 800);
         } else {
           setTimeout(() => r(undefined), 800);
@@ -470,7 +721,6 @@ h1 {
   const renderCodeToImage = async (html) => {
     const html2canvas = (await import("html2canvas")).default;
 
-    // Use an iframe to isolate each render — prevents html2canvas DOM conflicts
     const iframe = document.createElement("iframe");
     iframe.style.cssText =
       "position:fixed;left:-9999px;top:0;width:700px;height:600px;border:none;background:#fff;";
@@ -484,7 +734,6 @@ h1 {
 
       await new Promise((r) => setTimeout(r, 300));
 
-      // Resize iframe to fit content
       const h = iDoc.body.scrollHeight;
       iframe.style.height = h + "px";
       await new Promise((r) => setTimeout(r, 100));
@@ -516,10 +765,10 @@ h1 {
       } = await import("docx");
       const { saveAs } = await import("file-saver");
 
-      // Pre-render all output images first to avoid sequential DOM issues
+      // Pre-render HTML output images
       const outputImages = new Map();
       for (const b of blocks) {
-        if (b.type === "question" && b.includeOutput) {
+        if (b.type === "question" && b.includeOutput && !getRunnable(b.files)) {
           const combined = combineFilesForRender(b.files);
           if (combined.trim()) {
             try {
@@ -603,6 +852,40 @@ h1 {
             }
           }
 
+          // Test Input (stdin)
+          if (b.stdin?.trim()) {
+            children.push(
+              new Paragraph({
+                spacing: { before: 160 },
+                children: [
+                  new TextRun({ text: "Test Input:", bold: true, size: 22, color: "555555" }),
+                ],
+              })
+            );
+            const stdinLines = b.stdin.split("\n");
+            for (let i = 0; i < stdinLines.length; i++) {
+              children.push(
+                new Paragraph({
+                  spacing: { after: 0, before: 0, line: 276 },
+                  shading: { fill: "F5F5F5" },
+                  border: {
+                    top: i === 0 ? { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" } : undefined,
+                    bottom: i === stdinLines.length - 1 ? { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" } : undefined,
+                    left: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" },
+                    right: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" },
+                  },
+                  children: [
+                    new TextRun({
+                      text: stdinLines[i] || " ",
+                      font: "Courier New",
+                      size: 20,
+                    }),
+                  ],
+                })
+              );
+            }
+          }
+
           // Output
           if (b.includeOutput) {
             children.push(
@@ -614,28 +897,56 @@ h1 {
               })
             );
 
-            const imgData = outputImages.get(b.id);
-            if (imgData) {
-              children.push(
-                new Paragraph({
-                  spacing: { before: 80 },
-                  children: [
-                    new ImageRun({
-                      data: imgData,
-                      transformation: { width: 550, height: 300 },
-                      type: "png",
-                    }),
-                  ],
-                })
-              );
+            const runnable = getRunnable(b.files);
+            if (runnable && b.output) {
+              // Text output for code blocks
+              const outLines = b.output.split("\n");
+              for (let i = 0; i < outLines.length; i++) {
+                children.push(
+                  new Paragraph({
+                    spacing: { after: 0, before: 0, line: 276 },
+                    shading: { fill: "F5F5F5" },
+                    border: {
+                      top: i === 0 ? { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" } : undefined,
+                      bottom: i === outLines.length - 1 ? { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" } : undefined,
+                      left: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" },
+                      right: { style: BorderStyle.SINGLE, size: 1, color: "DDDDDD" },
+                    },
+                    children: [
+                      new TextRun({
+                        text: outLines[i] || " ",
+                        font: "Courier New",
+                        size: 20,
+                      }),
+                    ],
+                  })
+                );
+              }
             } else {
-              children.push(
-                new Paragraph({
-                  children: [
-                    new TextRun({ text: "(Could not render output)", italics: true, color: "999999" }),
-                  ],
-                })
-              );
+              // HTML rendered image output
+              const imgData = outputImages.get(b.id);
+              if (imgData) {
+                children.push(
+                  new Paragraph({
+                    spacing: { before: 80 },
+                    children: [
+                      new ImageRun({
+                        data: imgData,
+                        transformation: { width: 550, height: 300 },
+                        type: "png",
+                      }),
+                    ],
+                  })
+                );
+              } else {
+                children.push(
+                  new Paragraph({
+                    children: [
+                      new TextRun({ text: "(No output)", italics: true, color: "999999" }),
+                    ],
+                  })
+                );
+              }
             }
           }
 
@@ -660,6 +971,15 @@ h1 {
 
   const questionBlocks = blocks.filter((b) => b.type === "question");
 
+  const getPlaceholder = (name) => {
+    if (name.endsWith(".py")) return 'print("Hello, World!")';
+    if (name.endsWith(".cpp")) return '#include <iostream>\nusing namespace std;\nint main() {\n    cout << "Hello";\n    return 0;\n}';
+    if (name.endsWith(".java")) return 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello");\n    }\n}';
+    if (name.endsWith(".css")) return "body { margin: 0; }";
+    if (name.endsWith(".js")) return 'console.log("hello");';
+    return "<div>Hello World</div>";
+  };
+
   return (
     <div className="min-h-screen bg-[#0c0c0f] text-zinc-200 pb-24">
       <div className="mx-auto max-w-3xl p-6">
@@ -672,12 +992,22 @@ h1 {
             </p>
           </div>
           {blocks.length === 0 && (
-            <button
-              onClick={loadDemo}
-              className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm font-medium text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200 transition-colors"
-            >
-              Load Demo
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {[
+                ["HTML/CSS", loadHtmlDemo],
+                ["Python", loadPythonDemo],
+                ["C++", loadCppDemo],
+                ["Java", loadJavaDemo],
+              ].map(([label, fn]) => (
+                <button
+                  key={label}
+                  onClick={fn}
+                  className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200 transition-colors"
+                >
+                  {label} Demo
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -733,6 +1063,7 @@ h1 {
             const summary = isQuestion
               ? b.question || "(empty question)"
               : b.content.slice(0, 50) || "(empty text)";
+            const runnable = isQuestion ? getRunnable(b.files) : null;
 
             return (
               <div
@@ -865,13 +1196,7 @@ h1 {
                                 rows={8}
                                 spellCheck={false}
                                 className="w-full resize-y border-t border-white/[0.04] bg-[#111115] p-3 font-mono text-xs leading-relaxed text-zinc-300 placeholder-zinc-700 focus:outline-none"
-                                placeholder={
-                                  f.name.endsWith(".css")
-                                    ? "body { margin: 0; }"
-                                    : f.name.endsWith(".js")
-                                      ? 'console.log("hello");'
-                                      : "<div>Hello World</div>"
-                                }
+                                placeholder={getPlaceholder(f.name)}
                               />
                             </div>
                           ))}
@@ -883,6 +1208,43 @@ h1 {
                         >
                           + Add file
                         </button>
+
+                        {/* Run section for runnable blocks */}
+                        {runnable && (
+                          <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+                            <div className="mb-2">
+                              <label className="mb-1.5 block text-xs font-medium text-zinc-500">
+                                Stdin / Test Input
+                              </label>
+                              <textarea
+                                value={b.stdin || ""}
+                                onChange={(e) => updateBlock(b.id, { stdin: e.target.value })}
+                                rows={2}
+                                spellCheck={false}
+                                className="w-full resize-y rounded-lg border border-white/[0.06] bg-[#111115] p-2 font-mono text-xs leading-relaxed text-zinc-300 placeholder-zinc-700 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30 transition-all"
+                                placeholder="Enter test input here..."
+                              />
+                            </div>
+                            <button
+                              onClick={() => runBlock(b.id)}
+                              disabled={b.running}
+                              className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-40 transition-colors"
+                            >
+                              {b.running ? "Running..." : "Run"}
+                            </button>
+
+                            {b.output && (
+                              <div className="mt-2">
+                                <label className="mb-1 block text-xs font-medium text-zinc-500">
+                                  Output
+                                </label>
+                                <pre className="max-h-48 overflow-auto rounded-lg border border-white/[0.06] bg-[#111115] p-2 font-mono text-xs leading-relaxed text-zinc-300 whitespace-pre-wrap">
+                                  {b.output}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </>
                     ) : (
                       <textarea
